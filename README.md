@@ -7,7 +7,8 @@ This web application was designed to meet requirements of Project 2 in Geography
 This application is centered around a web map containing trail data and utility/points of interest locations for both parks. The map allows user to view, filter, add and update trail reports. The reports contain fields for park/trail name, report type
 
 ## Instructions
-* Open the index.html file in a browser to view the map.
+* Open the link below to start interacting with the web map:
+* https://huntermray.github.io/peoria-trail-reports/
 
 ## Programming
 * ArcGIS Online
@@ -17,5 +18,6 @@ This application is centered around a web map containing trail data and utility/
 Hunter Ray
 MS Program - GIS & Web Map Programming
 University of Wisconsin-Madison
+
 ## Acknowledgments
 * Data for trails in Kinsey Park and Wildlife Prairie Park were downloaded from (https://trailforks.com).
