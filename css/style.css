@@ -1,0 +1,119 @@
+html,
+body,
+#viewDiv {
+    padding: 0;
+    margin: 0;
+    height: 100%;
+    width: 100%;
+}
+#text-info{
+    height:auto;
+    width: 300px;
+    background-color: white;
+    border-left: 3px solid transparent;
+    display:block;
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding: 12px 7px 12px 20px;
+}
+
+/***** Customize FeatureForm/LayerList containers *****/
+.esri-item-list__scroller {
+    overflow-y: visible;
+}
+.editArea-container {
+    background: #fff;
+    line-height: 1.5em;
+    overflow: hidden;
+    padding: 12px 15px;
+    width: 300px;
+}
+.list-heading {
+    font-weight: normal;
+    margin-top: 5px;
+    margin-bottom: 10px;
+    color: #323232;
+}
+.or-wrap {
+    background-color: #e0e0e0;
+    height: 1px;
+    margin: 2em 0;
+    overflow: visible;
+}
+.or-text {
+    background: #fff;
+    line-height: 0;
+    padding: 0 1em;
+    position: relative;
+    bottom: 0.75em;
+}
+.esri-feature-form__date-format-hint,.esri-feature-form__date-format-hint{
+    visibility: hidden;
+    padding:0px;
+    height:0px
+}
+#editArea{
+    padding-top: 0px;
+}
+#formDiv{
+    width: auto;
+    padding-top: 0px;
+    background: #f2f2f2;
+    overflow: hidden;
+}
+
+/***** Customize the esri-popup CSS to make smaller *****/
+.esri-view-width-xlarge .esri-popup__main-container {
+    width: 225px;
+}
+.esri-popup__inline-actions-container:only-child>.esri-popup__action, .esri-popup__inline-actions-container:only-child>.esri-popup__action-toggle {
+    max-width: 75%;
+}
+.esri-popup__inline-actions-container>.esri-popup__action, .esri-popup__inline-actions-container>.esri-popup__action-toggle {
+    margin: 0 7px;
+    max-width: 100%;
+}
+.esri-ui-corner .esri-expand .esri-widget--panel, .esri-ui-corner .esri-expand .esri-widget--panel-height-only, .esri-ui-corner .esri-component .esri-widget--panel, .esri-ui-corner .esri-component.esri-widget--panel {
+    max-width: 250px;
+}
+.esri-item-list__group {
+    color: #6e6e6e;
+    padding: 0;
+    margin: 0;
+    width: auto;
+}
+.esri-item-list {
+    width: 200px;
+}
+.esri-item-list__filter-container{
+    visibility: hidden;
+    height: 0px;
+}
+.esri-input esri-item-list__filter-input{
+    visibility: hidden;
+}
+.esri-button{
+    border-color:#a0a3a5;
+}
+
+/***** Customize ReportFilter Widget *****/
+
+#reports-filter {
+    height: 160px;
+    width: 100%;
+    visibility: hidden;
+}
+.report-item {
+    width: 100%;
+    padding: 12px;
+    text-align: center;
+    vertical-align: baseline;
+    cursor: pointer;
+    height: 40px;
+}
+.report-item:focus {
+    background-color: dimgrey;
+}
+.report-item:hover {
+    background-color: dimgrey;
+}

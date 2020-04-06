@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta
+          name="viewport"
+          content="initial-scale=1,width=device-width,maximum-scale=1,user-scalable=no"
+          />
+    <title>Peoria Trail Reporting</title>
+    <link
+          rel="stylesheet"
+          href="https://js.arcgis.com/4.14/esri/themes/light/main.css"
+          />
+    <link rel="stylesheet" href="/css/style.css"/>
+    <script src="https://js.arcgis.com/4.14/"></script>
+      
+    <script>
+      require([
+          "esri/Map",
+          "esri/views/MapView",
+          "esri/layers/FeatureLayer",
+          "esri/Graphic",
+          "esri/widgets/Expand",
+          "esri/widgets/FeatureForm",
+          "esri/widgets/FeatureTemplates",
+          "esri/widgets/Home",
+          "esri/widgets/Locate",
+          "esri/widgets/LayerList",
+          "esri/widgets/Legend",
+          "esri/widgets/BasemapGallery",
+          "esri/widgets/Search"
+      ],function(
+              Map,
+               MapView,
+               FeatureLayer,
+               Graphic,
+               Expand,
+               FeatureForm,
+               FeatureTemplates,
+               Home,
+               Locate,
+               LayerList,
+               Legend,
+               BasemapGallery,
+               Search
+              ){
+          let editFeature, highlight, reportsLayerView, filterExpand, editExpand;
+
+          const popupTemplateUtils = {
+              // autocasts as new PopupTemplate()
+              title: "{UTILITY_TYPE}"};
+          const popupTemplateTrails = {
+              // autocasts as new PopupTemplate()
+              title: "{TRAIL_NAME} in {PARK_NAME} Park",
+              content: [{
+                  // It is also possible to set the fieldInfos outside of the content
+                  // directly in the popupTemplate. If no fieldInfos is specifically set
+                  // in the content, it defaults to whatever may be set within the popupTemplate.
+                  type: "fields",
+                  fieldInfos: [
+                      {
+                          fieldName: "TRAIL_NAME",label: "Name"
+                      },{
+                          fieldName: "TRAIL_DIFF",label: "Difficulty"
+                      },{
+                          fieldName: "TRAIL_TYPE",label: "Trail Type"
+                      },{
+                          fieldName: "DISTANCE_FT",
+                          label: "Distance(Ft)",
+                          format: {
+                              digitSeparator: true,
+                              places: 0
+                          }
+                      },{
+                          fieldName: "DESCENT_FT",
+                          label: "Descent(Ft)",
+                          format: {
+                              digitSeparator: true,
+                              places: 0
+                          }
+                      },{
+                          fieldName: "ALT_CLIMB_FT",
+                          label: "Climb(Ft)",
+                          format: {
+                              digitSeparator: true,
+                              places: 0
+                          }
+                      },{
+                          fieldName: "GRADE",
+                          label: "Grade",
+                          format: {
+                              digitSeparator: true,
+                              places: 2
+                          }
+                      },{
+                          fieldName: "ALT_MAX_FT",
+                          label: "Max. Alt. (Ft)",
+                          format: {
+                              digitSeparator: true,
+                              places: 0
+                          }
+                      }
+                  ]
+              }]
+          };
+
+          const reportsLayer = new FeatureLayer({
+              url:
+              "https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Peoria_Trail_Reports_2/FeatureServer/0",
+              title: "Trail Reports",
+              outFields: ["*"],
+              popupEnabled: true,
+              id: "reportsLayer",
+              visible: true
+          });
+
+          const utilitiesLayer = new FeatureLayer({
+              url:
+              "https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/KinseyPark_Utilities/FeatureServer/0",
+              title: "Access/Info",
+              outFields: ["*"],
+              popupEnabled: true,
+              popupTemplate: popupTemplateUtils,
+              id: "kpUtilities",
+              visible: false
+          });
+
+          const trailsLayer = new FeatureLayer({
+              url:
+              "https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/KP_WPP_Trails/FeatureServer/0",
+              title: "Trails",
+              outFields: ["*"],
+              popupEnabled: true,
+              popupTemplate: popupTemplateTrails,
+              id: "Trails",
+              visible: true
+          });
+
+          const map = new Map({
+              basemap: "hybrid",
+              layers: [trailsLayer,reportsLayer,utilitiesLayer]
+          });
+
+          const view = new MapView({
+              container: "viewDiv",
+              map: map,
+              //center and zoom settings referenced by homeBtn
+              center: [-89.726331, 40.7416835],
+              zoom: 13
+          });
+          
+          // Resets the View on initial load to
+          // center/zoom for full extent of trailsLayer contents
+          trailsLayer.when(() => {
+              view.goTo(trailsLayer.fullExtent);
+          });
+
+          const homeBtn = new Home({
+              view: view
+          });
+          //Add item to top left of map view
+          view.ui.add(homeBtn, "top-left");
+
+          const locateBtn = new Locate({
+              view: view
+          });
+          //Add item to top left of map view
+          view.ui.add(locateBtn, "top-left");
+
+          const layersWidg = new LayerList({
+              view: view,
+              listItemCreatedFunction: function(event) {
+                  const item = event.item;
+                  if (item.layer.id == "Trails") {
+                      // don't show legend twice
+                      item.panel = {
+                          content: "legend",
+                          open: true
+                      };
+                  } else if (item.layer.id != "Trails"){
+                      item.panel = {
+                          content: "legend",
+                          open: false
+                      };
+                  }
+              }
+          });
+
+          // add the layerList widget inside of Expand widget
+          const layersExpand = new Expand({
+              expandIconClass: "esri-icon-layers",
+              expandTooltip: "Layer List",
+              collapseTooltip: "Collapse Layer window",
+              view: view,
+              content: layersWidg,
+              expanded: true
+          });
+
+          // if layersExpand is clicked to expand while bgExpand/searchExpand are open
+          // close bgExpand/searchExpand to stop overlap
+          layersExpand.watch("expanded", function() {
+              //const layerExpandBool = layersExpand.expanded;
+              //console.log(layerExpandBool);
+              if (layersExpand.expanded === true){
+                  bgExpand.collapse();
+                  searchExpand.collapse();
+                  editExpand.collapse();
+                  infoExpand.collapse();
+                  filterExpand.collapse();
+              }
+          });
+          //Add item to top right of map view
+          view.ui.add(layersExpand, "top-right");
+
+          const reportsNodes = document.querySelectorAll(".report-item");
+          const reportsElement = document.getElementById("reports-filter");
+
+          // click event handler for seasons choices
+          reportsElement.addEventListener("click", filterByStatus);
+          // User clicked on Clear, Minor Issue, Major Issue, Closed
+          // set an attribute filter on trial reports layer view
+          // to display the reports with selected status
+          function filterByStatus(event) {
+              const selectedStatus = event.target.getAttribute("data-status");
+              reportsLayerView.filter = {
+                  where: "STATUS = '" + selectedStatus + "'"
+              };}
+
+          view.whenLayerView(reportsLayer).then(function(layerView) {
+              // flash trail reports layer loaded
+              // get a reference to the reports layerview
+              reportsLayerView = layerView;
+              // set up UI items
+              reportsElement.style.visibility = "visible";
+
+              filterExpand = new Expand({
+                  expandTooltip: "Filter by Report Status",
+                  collapseTooltip:"Collapse to clear filters",
+                  view: view,
+                  content: reportsElement,
+                  expandIconClass: "esri-icon-filter",
+                  group: "top-left"
+              });
+              //clear the filters when user closes the expand widget
+              filterExpand.watch("expanded", function() {
+                  if (!filterExpand.expanded) {
+                      reportsLayerView.filter = null;
+                  }
+                  if (filterExpand.expanded === true) {
+                      editExpand.collapse();
+                      infoExpand.collapse();
+                      searchExpand.collapse();
+                      bgExpand.collapse();
+                      layersExpand.collapse();
+                  }
+              });
+              //Add item to top left of map view
+              view.ui.add(filterExpand, "top-left");
+          });
+
+          // Create a BasemapGallery widget instance and set
+          // its container to a div element
+
+          const basemapGallery = new BasemapGallery({
+              view: view,
+              container: document.createElement("div")
+          });
+
+          // Create an Expand instance and set the content
+          // property to the DOM node of the basemap gallery widget
+          // Use an Esri icon font to represent the content inside
+          // of the Expand widget
+          const bgExpand = new Expand({
+              expandTooltip: "Basemap Selector",
+              collapseTooltip:"Collapse Basemap window",
+              view: view,
+              content: basemapGallery
+          });
+
+          // if sxmall mobile device is being used then
+          // close the expand whenever a basemap is selected
+          // if basemap selction made, close expand
+          basemapGallery.watch("activeBasemap", function() {
+              const mobileSize =
+                  view.heightBreakpoint === "xsmall" ||
+                  view.widthBreakpoint === "xsmall";
+              if (mobileSize) {
+                  bgExpand.collapse();
+              }
+              if (basemapGallery.activeBasemap !== ''){
+                  bgExpand.collapse();
+              }
+          });
+
+
+          // if bgExpand is clicked to expand while layersExpand open
+          // close layersExpand to stop overlap
+          bgExpand.watch("expanded", function() {
+              if (bgExpand.expanded === true){
+                  layersExpand.collapse();
+                  searchExpand.collapse();
+                  editExpand.collapse();
+                  filterExpand.collapse();
+                  infoExpand.collapse();
+              }
+          });
+
+          //Add item to top right of map view
+          view.ui.add(bgExpand, "top-right");
+
+          const searchWidget = new Search({
+              view: view,
+              allPlaceholder: "Trail Name",
+              includeDefaultSources: false,
+              sources: [
+                  {
+                      layer: trailsLayer,
+                      searchFields: ["TRAIL_NAME"],
+                      displayField: "TRAIL_NAME",
+                      exactMatch: false,
+                      //outFields: ["NAME", "TRAIL_DIFF", "TRAIL_TYPE"],
+                      name: "Trails",
+                      placeholder: "example: Land of Oz"
+                  }
+              ]
+          });
+
+          const searchExpand = new Expand({
+              expandTooltip: "Trail Search",
+              collapseTooltip: "Collapse search window",
+              view: view,
+              expanded: false,
+              content: searchWidget
+          });
+
+          // if searchExpand is clicked to expand while layersExpand open
+          // close layersExpand to stop overlap
+          searchExpand.watch("expanded", function() {
+              if (searchExpand.expanded === true){
+                  filterExpand.collapse();
+                  editExpand.collapse();
+                  infoExpand.collapse();
+                  layersExpand.collapse();
+                  bgExpand.collapse();
+              }
+          });
+
+          //Add item to top right of map view
+          view.ui.add(searchExpand, {position: "top-left"});
+
+          // New FeatureForm and set its layer to 'TrailReports' FeatureLayer.
+          // FeatureForm displays attributes of fields specified in fieldConfig.
+          const featureForm = new FeatureForm({
+              container: "formDiv",
+              layer: reportsLayer,
+              fieldConfig:[
+                  {
+                      name: "REPORTDATE",
+                      label: "Date",
+                      editable: false
+                  },{
+                      name: "PARKNAME",
+                      label: "Park Name",
+                      required: true
+                  },{
+                      name: "KP_TRAILNAME",
+                      label: "Trail Name",
+                      required: true,
+                      visibilityExpression: "($feature.PARKNAME=='kinsey')"
+                  },{
+                      name: "WPP_TRAILNAME",
+                      label: "Trail Name",
+                      required: true,
+                      visibilityExpression: "($feature.PARKNAME=='wildlife')"
+                  },{
+                      name: "STATUS",
+                      label: "Status",
+                      required: true
+                  },{
+                      name: "CONDITION",
+                      label: "Condition",
+                      required: true
+                  },{
+                      name: "DESCRIPTION1",
+                      label: "Issue Type",
+                      visibilityExpression: "($feature.CONDITION != 'ideal')"
+                  },{
+                      name: "DESCRIPTION2",
+                      label: "Description Comments",
+                      visibilityExpression: "($feature.CONDITION!='null' OR $feature.CONDITION=='unknown' OR $feature.DESCRIPTION1 == 'other')"
+                  },{
+                      name: "ACTIVITY",
+                      label: "Select your activity"
+                  }
+              ]
+          });
+
+          // Listen to the feature form's submit event.
+          // Update feature attributes shown in the form.
+          featureForm.on("submit", function() {
+              if (editFeature) {
+                  // Grab updated attributes from the form.
+                  const updated = featureForm.getValues();
+
+                  // Loop through updated attributes and assign
+                  // the updated values to feature attributes.
+                  Object.keys(updated).forEach(function(name) {
+                      editFeature.attributes[name] = updated[name];
+                  });
+
+                  // Setup the applyEdits parameter with updates.
+                  const edits = {
+                      updateFeatures: [editFeature]
+                  };
+                  applyEditsToIncidents(edits);
+                  document.getElementById("viewDiv").style.cursor = "auto";
+              }
+          });
+
+          // Check if the user clicked on the existing feature
+          selectExistingFeature();
+
+          // The FeatureTemplates widget uses the 'addTemplatesDiv'
+          // element to display feature templates from reportsLayer
+          const templates = new FeatureTemplates({
+              container: "addTemplatesDiv",
+              filterEnabled: false,
+              layers: [reportsLayer]
+          });
+
+          // Listen for when a template item is selected
+          templates.on("select", function(evtTemplate) {
+              // Access the template item's attributes from the event's
+              // template prototype.
+              attributes = evtTemplate.template.prototype.attributes;
+              unselectFeature();
+              document.getElementById("viewDiv").style.cursor = "crosshair";
+
+              // With the selected template item, listen for the view's click event and create feature
+              const handler = view.on("click", function(event) {
+                  // remove click event handler once user clicks on the view
+                  // to create a new feature
+                  handler.remove();
+                  event.stopPropagation();
+                  featureForm.feature = null;
+
+                  if (event.mapPoint) {
+                      point = event.mapPoint.clone();
+                      point.z = undefined;
+                      point.hasZ = false;
+
+                      // Create a new feature using one of the selected
+                      // template items.
+                      editFeature = new Graphic({
+                          geometry: point,
+                          attributes: {
+                              STATUS: attributes.STATUS,
+                              REPORTDATE: new Date()
+                          }
+                      });
+
+                      // Setup the applyEdits parameter with adds.
+                      const edits = {
+                          addFeatures: [editFeature]
+                      };
+                      applyEditsToIncidents(edits);
+                      document.getElementById("viewDiv").style.cursor = "auto";
+                  } else {
+                      console.error("event.mapPoint is not defined");
+                  }
+              });
+          });
+          // Call FeatureLayer.applyEdits() with specified params.
+          function applyEditsToIncidents(params) {
+              unselectFeature();
+              reportsLayer
+                  .applyEdits(params)
+                  .then(function(editsResult) {
+                  // Get the objectId of the newly added feature.
+                  // Call selectFeature function to highlight the new feature.
+                  if (
+                      editsResult.addFeatureResults.length > 0 ||
+                      editsResult.updateFeatureResults.length > 0
+                  ) {
+                      unselectFeature();
+                      let objectId;
+                      if (editsResult.addFeatureResults.length > 0) {
+                          objectId = editsResult.addFeatureResults[0].objectId;
+                      } else {
+                          featureForm.feature = null;
+                          objectId = editsResult.updateFeatureResults[0].objectId;
+                      }
+                      selectFeature(objectId);
+                      if (addFeatureDiv.style.display != "") {
+                          toggleEditingDivs("none", "block");
+                      }
+                  }
+                  //*** Deletion of features is DISABLED in reportsLayer
+                  // show FeatureTemplates if user deleted a feature
+                  /*
+                  else if (editsResult.deleteFeatureResults.length > 0) {
+                      toggleEditingDivs("block", "none");
+                  }
+                  */
+              })
+                  .catch(function(error) {
+                  console.log("===============================================");
+                  console.error(
+                      "[ applyEdits ] FAILURE: ",
+                      error.code,
+                      error.name,
+                      error.message
+                  );
+                  console.log("error = ", error);
+              });
+          }
+
+          // Check if a user clicked on an incident feature.
+          function selectExistingFeature() {
+              view.on("click", function(event) {
+
+                  // clear previous feature selection
+                  unselectFeature();
+                  if (
+                      document.getElementById("viewDiv").style.cursor != "crosshair"
+                  ) {
+                      view.hitTest(event).then(function(response) {
+                          // If a user clicks on an incident feature, select the feature.
+                          if (response.results.length === 0) {
+                              toggleEditingDivs("block", "none");
+                          } else if (
+                              response.results[0].graphic &&
+                              response.results[0].graphic.layer.id == "reportsLayer"
+                          ) 
+                          {
+                              if (addFeatureDiv.style.display === "block") {
+                                  toggleEditingDivs("none", "block");
+                                  // change value of btnUpdate from 'Submit' to 'Update'
+                                  document.getElementById("btnUpdate").value="Update";
+                              }
+                              selectFeature(
+                                  response.results[0].graphic.attributes[
+                                      reportsLayer.objectIdField
+                                  ]
+                              );}
+                      });
+                  }
+              });
+          };
+
+          // Highlights the clicked feature and display
+          // the feature form with the incident's attributes.
+          function selectFeature(objectId) {
+              // query feature from the server
+              reportsLayer
+                  .queryFeatures({
+                  objectIds: [objectId],
+                  outFields: ["*"],
+                  returnGeometry: true
+              })
+                  .then(function(results) {
+                  if (results.features.length > 0) {
+                      //editExpand.expand();
+                      editFeature = results.features[0];
+                      // display the attributes of selected feature in the form
+                      featureForm.feature = editFeature;
+                      // highlight the feature on the view
+                      view.whenLayerView(editFeature.layer).then(function(layerView) {
+                          highlight = layerView.highlight(editFeature);
+                      });
+                  }
+              }
+                       );
+          };
+
+          // Expand widget for the editArea div.
+          editExpand = new Expand({
+              expandIconClass: "esri-icon-edit",
+              expandTooltip: "Expand Edit",
+              expanded: true,
+              view: view,
+              content: document.getElementById("editArea")
+          });
+
+          // if editExpand is clicked to expand while filterExpand open
+          // close filterExpand to stop overlap
+          editExpand.watch("expanded", function() {
+              if (editExpand.expanded === true){
+                  filterExpand.collapse();
+                  infoExpand.collapse();
+                  searchExpand.collapse();
+                  layersExpand.collapse();
+                  bgExpand.collapse();
+              }
+          });
+          //Add item to top left of map view
+          view.ui.add(editExpand, "top-left");
+
+          // input boxes for the attribute editing
+          const addFeatureDiv = document.getElementById("addFeatureDiv");
+          const attributeEditing = document.getElementById("featureUpdateDiv");
+
+          // Controls visibility of addFeature or attributeEditing divs
+          function toggleEditingDivs(addDiv, attributesDiv) {
+              addFeatureDiv.style.display = addDiv;
+              attributeEditing.style.display = attributesDiv;
+              document.getElementById(
+                  "updateInstructionDiv"
+              ).style.display = addDiv;
+          };
+
+          // Remove the feature highlight and remove attributes
+          // from the feature form.
+          function unselectFeature() {
+              if (highlight) {
+                  highlight.remove();
+                  //editExpand.collapse();
+              }
+              toggleEditingDivs("block", "none");
+          };
+
+          // Update attributes of the selected feature.
+          document.getElementById("btnUpdate").onclick = function() {
+              // Fires feature form's submit event.
+              featureForm.submit();
+          };
+          
+          // *** Deletion of data is DISABLED in reportsLayer
+          // Delete the selected feature. ApplyEdits is called
+          // with the selected feature to be deleted.
+          /*
+          document.getElementById("btnDelete").onclick = function() {
+              // setup the applyEdits parameter with deletes.
+              const edits = {
+                  deleteFeatures: [editFeature]
+              };
+              applyEditsToIncidents(edits);
+              document.getElementById("viewDiv").style.cursor = "auto";
+          };
+          */
+
+          // Expand widget for the information div.
+          const infoExpand = new Expand({
+              expandIconClass: "esri-icon-notice-round",
+              expandTooltip: "Expand for Park Information",
+              expanded: false,
+              view: view,
+              content: document.getElementById("text-info")
+          });
+          
+          // if editExpand is clicked to expand while filterExpand open
+          // close filterExpand to stop overlap
+          infoExpand.watch("expanded", function() {
+              if (infoExpand.expanded === true){
+                  editExpand.collapse();
+                  filterExpand.collapse();
+                  searchExpand.collapse();
+                  layersExpand.collapse();
+                  bgExpand.collapse();
+              }
+          });
+          //Add item to bottom left of map view
+          view.ui.add(infoExpand, "bottom-left");
+
+      });
+    </script>
+</head>
+
+<body>
+    <div id="editArea" class="editArea-container esri-widget--panel">
+        <div id="addFeatureDiv" style="display:block;">
+            <h3 class="list-heading">Trail Reporting</h3>
+            <ul style="font-size: 13px; padding-left: 1.5em;">
+                <li>Select template below then click on the map to create a new feature</li>
+                <li>Enter attribute data</li>
+                <li>Click <i>Submit</i> to submit report</li>
+            </ul>
+            <div id="addTemplatesDiv" style="background:#fff;"></div>
+        </div>
+        <div id="featureUpdateDiv" style="display:none; margin-top: 1em;">
+            <h3 class="list-heading">Enter the report information</h3>
+            <div id="attributeArea">
+                <div id="formDiv"></div>
+                <input
+                       type="button"
+                       class="esri-button"
+                       value="Submit"
+                       id="btnUpdate"
+                       />
+            </div>
+            <!-- **DELETE disabled for reportsLayer
+            <br/>
+            <div id="deleteArea">
+                <input
+                       type="button"
+                       class="esri-button"
+                       value="Delete incident"
+                       id="btnDelete"
+                       />
+            </div>
+            -->
+        </div>
+        <div id="updateInstructionDiv" style="text-align:center; display:block">
+            <p class="or-wrap"><span class="or-text">Or</span></p>
+            <p id="selectHeader">Select an incident to edit.</p>
+        </div>
+    </div>
+    <div id=text-info><b>Kinsey Park Background</b>
+        <div>
+            <p>Kinsey is a Peoria Park District mountain bike specific trail system built with beginners and intermediate  riders in mind by the great group of trail magicians from the Peoria Area Mountain Bike Association (PAMBA)</p>
+            <p><a href="https://www.facebook.com/pages/Kinsey-Park/596756390486592">KP Facebook Page</a></p>
+        </div>
+        <b>WPP Background</b>
+        <div>
+            <p>Wildlife Prairie Park is the second newest trail system in the Peoria area. It consists of over 10 miles of flowing singletrack with lots of rock and shale left over from the land’s strip mining days. The day use fee is currently $9, which grants access to all activities on both sides of the park. For the daily fee users, there is a self-pay drop box next to the sign-in kiosk.</p>
+            <p><a href="https://www.facebook.com/wildlifeprairiepark/">WPP Facebook Page</a></p>
+        </div>
+    </div>
+    <div id="reports-filter" class="esri-widget">
+      <div class="report-item visible-report" data-status="clear">Clear</div>
+      <div class="report-item visible-report" data-status="issue_minor">Minor Issue</div>
+      <div class="report-item visible-report" data-status="issue_major">Major_Issue</div>
+      <div class="report-item visible-report" data-status="closed">Closure</div>
+    </div>
+    <div id="viewDiv"></div>
+</body>
+</html>
