@@ -8,7 +8,7 @@ This application is centered around a web map containing trail data and utility/
 
 ## Instructions
 * Open the link below to start interacting with the web map:
-* https://huntermray.github.io/peoria-trail-reports/
+* (https://github.com/huntermray/peoria-trail-reports-G777)
 
 ## Programming
 * ArcGIS Online
